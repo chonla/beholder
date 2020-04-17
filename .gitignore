@@ -1,0 +1,4 @@
+node_modules/
+LAST_UPDATE
+yarn.lock
+.env

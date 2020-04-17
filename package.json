@@ -1,0 +1,9 @@
+{
+  "name": "beholder",
+  "version": "1.0.0",
+  "dependencies": {
+    "dotenv": "^8.2.0",
+    "es6-template-strings": "^2.0.1",
+    "node-fetch": "^2.6.0"
+  }
+}
