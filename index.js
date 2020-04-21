@@ -16,8 +16,9 @@ const APP_VERSION = package.version;
 const REPOSITORY = process.env.REPOSITORY.trim();
 const INTERVAL = parseInt(process.env.INTERVAL, 10);
 const CHECKING_INTERVAL = INTERVAL * 60 * 1000;
-const HOOKS = [];
 const HOOKS_DIR = './hooks/';
+const SINGLE_RUN = (process.env.SINGLE_RUN.trim() === 'true');
+const IGNORE_LAST_UPDATE = (process.env.IGNORE_LAST_UPDATE.trim() === 'true');
 
 const logger = require('./logger/logger')({
     namespace: `${APP_NAME}:${REPOSITORY}`,
@@ -44,47 +45,82 @@ logger.info(`repository: ${logger.variable(REPOSITORY)}`);
 logger.info(`ignored tags: ${logger.variable(process.env.IGNORED_TAGS.split(',').map(t => t.trim()).join(','))}`);
 logger.info(`checking interval: ${logger.variable(INTERVAL)} min(s)`);
 logger.info(`total hooks: ${logger.variable(hooks.length)}`);
+logger.info(`single run: ${logger.variable(process.env.SINGLE_RUN.trim())}`);
+logger.info(`ignore last update: ${logger.variable(process.env.IGNORE_LAST_UPDATE.trim())}`);
 
 for (var h in hooks) {
     logger.info(`hooks #${logger.variable(1 + parseInt(h, 10))}: ${logger.variable(hooks[h].name)}`);
 }
 
-const url = `https://hub.docker.com/v2/repositories/${REPOSITORY}/tags/?page_size=${process.env.POLL_SIZE}&page=1&ordering=last_updated`;
+const baseUrl = `https://hub.docker.com/v2/repositories/${REPOSITORY}/tags/?page_size=${process.env.POLL_SIZE}&ordering=last_updated`;
 const ignoredTags = process.env.IGNORED_TAGS.split(',');
 let lastUpdated = new Date('2000-01-18T19:20:00.000000Z');
 
-try {
-    const data = fs.readFileSync('./LAST_UPDATE').toString().trim();
-    if (data != '') {
-        lastUpdated = new Date(data);
-        logger.info(`first time: ${logger.variable('FALSE')}`);
-        logger.info(`latest release: ${logger.variable(data)}`);
-    } else {
-        logger.info(`first time: ${logger.variable('TRUE')}`);
-    }
-} catch (e) {}
+if (!IGNORE_LAST_UPDATE) {
+    try {
+        const data = fs.readFileSync('./LAST_UPDATE').toString().trim();
+        if (data != '') {
+            lastUpdated = new Date(data);
+            logger.info(`first time: ${logger.variable('FALSE')}`);
+            logger.info(`latest release: ${logger.variable(data)}`);
+        } else {
+            logger.info(`first time: ${logger.variable('TRUE')}`);
+        }
+    } catch (e) {}
+}
+
+function getReleaseFromUrl(url) {
+    const finder$ = new Promise((resolve, reject) => {
+        const releaseFetch = (url) => {
+            fetch(url)
+                .then((resp) => resp.json())
+                .then((data, error) => {
+                    const result = data.results
+                        .filter((tag) => {
+                            return ignoredTags.filter(t => {
+                                const re = new RegExp(t, 'gi');
+                                return !re.test(tag.name);
+                            }).length == ignoredTags.length;
+                        })
+                        .filter((tag) => !lastUpdated || (lastUpdated && (new Date(tag.last_updated) > lastUpdated)))
+                        .reduce((accum, tag) => {
+                            const tag_updated = new Date(tag.last_updated);
+                            if (!accum || (accum && accum.safe_last_updated < tag_updated)) {
+                                accum = tag;
+                                accum.safe_last_updated = tag_updated;
+                            }
+                            return accum;
+                        }, null);
+
+                    if (result) {
+                        resolve(result);
+                    } else {
+                        if (data.next) {
+                            logger.info(`navigate to next page...`);
+                            releaseFetch(data.next);
+                        } else {
+                            reject();
+                        }
+                    }
+                });
+        }
+
+        releaseFetch(url);
+    });
+
+    return finder$;
+}
 
 function checkRelease() {
 
+    let url = `${baseUrl}&page=1`;
+
     logger.info('checking for new release');
-    fetch(url)
-        .then((resp) => resp.json())
-        .then((data, error) => {
-            const result = data.results
-                .filter((tag) => ignoredTags.indexOf(tag.name) < 0)
-                .filter((tag) => !lastUpdated || (lastUpdated && (new Date(tag.last_updated) > lastUpdated)))
-                .reduce((accum, tag) => {
-                    const tag_updated = new Date(tag.last_updated);
-                    if (!accum || (accum && accum.safe_last_updated < tag_updated)) {
-                        accum = tag;
-                        accum.safe_last_updated = tag_updated;
-                    }
-                    return accum;
-                }, null);
+    getReleaseFromUrl(url)
+        .then(result => {
+            logger.info(`new release found: ${logger.variable(result.name)}`);
 
-            if (result) {
-                logger.info(`new release found: ${logger.variable(result.name)}`);
-
+            if (!IGNORE_LAST_UPDATE) {
                 // store for future used
                 lastUpdated = result.safe_last_updated;
 
@@ -92,43 +128,47 @@ function checkRelease() {
                     if (err) throw err;
                     logger.info('latest release timestamp has been saved');
                 });
-
-                for (var h in hooks) {
-                    logger.info(`triggering webhook ${logger.variable(hooks[h].name)}`);
-
-                    let req = {
-                        method: 'get'
-                    };
-                    const url = template(hooks[h].url, result).toString().trim();
-
-                    if (hooks[h].method === 'post') {
-                        const bodyString = (typeof hooks[h].body === 'object') ? JSON.stringify(hooks[h].body) : hooks[h].body;
-                        const body = template(bodyString, result);
-                        req = {
-                            method: 'post',
-                            body: body,
-                            headers: {
-                                'Content-Type': 'application/json'
-                            }
-                        };
-                    }
-
-                    ((name, url, req) => {
-                        fetch(url, req)
-                            .then(data => {
-                                logger.info(`webhook ${logger.variable(name)} triggered`, data);
-                            })
-                            .catch(e => {
-                                logger.e(`webhook ${logger.variable(name)} returns error`, e);
-                            });
-                    })(hooks[h].name, url, req);
-                }
-            } else {
-                logger.info('no new release found');
             }
+
+            for (var h in hooks) {
+                logger.info(`triggering webhook ${logger.variable(hooks[h].name)}`);
+
+                let req = {
+                    method: 'get'
+                };
+                const url = template(hooks[h].url, result).toString().trim();
+
+                if (hooks[h].method === 'post') {
+                    const bodyString = (typeof hooks[h].body === 'object') ? JSON.stringify(hooks[h].body) : hooks[h].body;
+                    const body = template(bodyString, result);
+                    req = {
+                        method: 'post',
+                        body: body,
+                        headers: {
+                            'Content-Type': 'application/json'
+                        }
+                    };
+                }
+
+                ((name, url, req) => {
+                    fetch(url, req)
+                        .then(data => {
+                            logger.info(`webhook ${logger.variable(name)} triggered`, data);
+                        })
+                        .catch(e => {
+                            logger.e(`webhook ${logger.variable(name)} returns error`, e);
+                        });
+                })(hooks[h].name, url, req);
+            }
+        })
+        .catch(() => {
+            logger.info('no new release found');
         });
 
-    setTimeout(checkRelease, CHECKING_INTERVAL);
+
+    if (!SINGLE_RUN) {
+        setTimeout(checkRelease, CHECKING_INTERVAL);
+    }
 }
 
 checkRelease();
