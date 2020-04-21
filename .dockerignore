@@ -2,3 +2,4 @@ node_modules/
 yarn.lock
 LAST_UPDATE
 .env
+hooks/

@@ -4,7 +4,32 @@ Docker release monitoring tool.
 
 ## Notification
 
-I start with Slack notification. Other notifications will be added later.
+All hook configurations are stored in `./hooks` directory as `json` file. Here is the hook json format.
+
+```
+{
+    "name": "<name of your hook>",
+    "enabled": <true to enable or false to disable>,
+    "method": "<get or post>",
+    "url": "<hook url to be triggered>",
+    "body": <body, can be JSON or string>
+}
+```
+
+## Hook file example
+
+```
+{
+    "name": "Slack",
+    "enabled": true,
+    "method": "post",
+    "url": "https://hooks.slack.com/services/...",
+    "body": {
+        "text": "New update found `${name}`",
+        "link_names": true
+    }
+}
+```
 
 ## Configuration
 
@@ -18,8 +43,6 @@ DockMon uses `.env`.
 | INTERVAL | Interval for polling |
 | IGNORED_TAGS | Tags list to be ignored. Use comma for multiple tags. For example, `canary,latest` |
 | POLL_SIZE | Polling page size |
-| SLACK_WEBHOOK | Slack webhook |
-| SLACK_MESSAGE | Slack message |
 
 ## Notification message
 
