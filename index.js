@@ -88,10 +88,10 @@ function checkRelease() {
                 // store for future used
                 lastUpdated = result.safe_last_updated;
 
-                // fs.writeFile('./LAST_UPDATE', result.last_updated, (err) => {
-                //     if (err) throw err;
-                //     logger.info('latest release timestamp has been saved');
-                // });
+                fs.writeFile('./LAST_UPDATE', result.last_updated, (err) => {
+                    if (err) throw err;
+                    logger.info('latest release timestamp has been saved');
+                });
 
                 for (var h in hooks) {
                     logger.info(`triggering webhook ${logger.variable(hooks[h].name)}`);
@@ -128,7 +128,7 @@ function checkRelease() {
             }
         });
 
-    // setTimeout(checkRelease, CHECKING_INTERVAL);
+    setTimeout(checkRelease, CHECKING_INTERVAL);
 }
 
 checkRelease();
