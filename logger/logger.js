@@ -47,6 +47,9 @@ class Logger {
     }
 
     colorize(code, text) {
+        if (this.options.monochrome) {
+            return `${text}`;
+        }
         return `\x1b[${code}m${text}\x1b[0m`;
     }
 }

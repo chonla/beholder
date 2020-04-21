@@ -19,11 +19,13 @@ const CHECKING_INTERVAL = INTERVAL * 60 * 1000;
 const HOOKS_DIR = './hooks/';
 const SINGLE_RUN = (process.env.SINGLE_RUN && (process.env.SINGLE_RUN.trim() === 'true'));
 const IGNORE_LAST_UPDATE = (process.env.IGNORE_LAST_UPDATE && (process.env.IGNORE_LAST_UPDATE.trim() === 'true'));
+const MONOCHROME = (process.env.MONOCHROME && (process.env.MONOCHROME.trim() === 'true'));
 
 const logger = require('./logger/logger')({
     namespace: `${APP_NAME}:${REPOSITORY}`,
     boldVariable: false,
-    timestamp: true
+    timestamp: true,
+    monochrome: MONOCHROME
 });
 
 let hooks = [];
@@ -47,6 +49,7 @@ logger.info(`checking interval: ${logger.variable(INTERVAL)} min(s)`);
 logger.info(`total hooks: ${logger.variable(hooks.length)}`);
 logger.info(`single run: ${SINGLE_RUN}`);
 logger.info(`ignore last update: ${IGNORE_LAST_UPDATE}`);
+logger.info(`monochrome: ${MONOCHROME}`);
 
 for (var h in hooks) {
     logger.info(`hooks #${logger.variable(1 + parseInt(h, 10))}: ${logger.variable(hooks[h].name)}`);
