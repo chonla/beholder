@@ -17,8 +17,8 @@ const REPOSITORY = process.env.REPOSITORY.trim();
 const INTERVAL = parseInt(process.env.INTERVAL, 10);
 const CHECKING_INTERVAL = INTERVAL * 60 * 1000;
 const HOOKS_DIR = './hooks/';
-const SINGLE_RUN = (process.env.SINGLE_RUN.trim() === 'true');
-const IGNORE_LAST_UPDATE = (process.env.IGNORE_LAST_UPDATE.trim() === 'true');
+const SINGLE_RUN = (process.env.SINGLE_RUN && (process.env.SINGLE_RUN.trim() === 'true'));
+const IGNORE_LAST_UPDATE = (process.env.IGNORE_LAST_UPDATE && (process.env.IGNORE_LAST_UPDATE.trim() === 'true'));
 
 const logger = require('./logger/logger')({
     namespace: `${APP_NAME}:${REPOSITORY}`,
@@ -45,8 +45,8 @@ logger.info(`repository: ${logger.variable(REPOSITORY)}`);
 logger.info(`ignored tags: ${logger.variable(process.env.IGNORED_TAGS.split(',').map(t => t.trim()).join(','))}`);
 logger.info(`checking interval: ${logger.variable(INTERVAL)} min(s)`);
 logger.info(`total hooks: ${logger.variable(hooks.length)}`);
-logger.info(`single run: ${logger.variable(process.env.SINGLE_RUN.trim())}`);
-logger.info(`ignore last update: ${logger.variable(process.env.IGNORE_LAST_UPDATE.trim())}`);
+logger.info(`single run: ${SINGLE_RUN}`);
+logger.info(`ignore last update: ${IGNORE_LAST_UPDATE}`);
 
 for (var h in hooks) {
     logger.info(`hooks #${logger.variable(1 + parseInt(h, 10))}: ${logger.variable(hooks[h].name)}`);

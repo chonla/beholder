@@ -1,6 +1,6 @@
 {
   "name": "beholder",
-  "version": "1.2.0",
+  "version": "1.2.2",
   "dependencies": {
     "dotenv": "^8.2.0",
     "es6-template-strings": "^2.0.1",
